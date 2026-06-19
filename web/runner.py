@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 from typing import Any
 
 from web.progress import PIPELINE_STAGES, ProgressTracker
+
+logger = logging.getLogger(__name__)
 
 
 _REPORT_KEY_TO_STAGE = {s["report_key"]: s["id"] for s in PIPELINE_STAGES}
@@ -31,30 +34,36 @@ def _detect_completed_stages(
         stage_id = _REPORT_KEY_TO_STAGE[report_key]
         content = chunk.get(report_key, "")
         if content and tracker.stage_status(stage_id) != "done":
+            logger.info("阶段完成: %s", stage_id)
             tracker.mark_stage_done(stage_id, _strip_think_tags(str(content)))
 
     dqs = chunk.get("data_quality_summary", "")
     if dqs and tracker.stage_status("quality_gate") != "done":
+        logger.info("阶段完成: quality_gate")
         tracker.mark_stage_done("quality_gate", str(dqs))
 
     debate = chunk.get("investment_debate_state")
     if debate and isinstance(debate, dict):
         judge = debate.get("judge_decision", "")
         if judge and tracker.stage_status("debate") != "done":
+            logger.info("阶段完成: debate")
             tracker.mark_stage_done("debate", str(judge))
 
     trader_plan = chunk.get("trader_investment_plan", "")
     if trader_plan and tracker.stage_status("trader") != "done":
+        logger.info("阶段完成: trader")
         tracker.mark_stage_done("trader", _strip_think_tags(str(trader_plan)))
 
     risk = chunk.get("risk_debate_state")
     if risk and isinstance(risk, dict):
         risk_judge = risk.get("judge_decision", "")
         if risk_judge and tracker.stage_status("risk") != "done":
+            logger.info("阶段完成: risk")
             tracker.mark_stage_done("risk", str(risk_judge))
 
     final = chunk.get("final_trade_decision", "")
     if final and tracker.stage_status("pm") != "done":
+        logger.info("阶段完成: pm")
         tracker.mark_stage_done("pm", _strip_think_tags(str(final)))
 
 
@@ -72,6 +81,7 @@ def _run(ticker: str, trade_date: str, config: dict, tracker: ProgressTracker) -
     from cli.stats_handler import StatsCallbackHandler
     from tradingagents.graph.trading_graph import TradingAgentsGraph
 
+    logger.info("开始分析: %s (%s)", ticker, trade_date)
     stats = StatsCallbackHandler()
 
     graph = TradingAgentsGraph(
@@ -99,6 +109,7 @@ def _run(ticker: str, trade_date: str, config: dict, tracker: ProgressTracker) -
     graph._log_state(trade_date, last_chunk)
 
     tracker.mark_complete(last_chunk, signal)
+    logger.info("分析完成: %s (%s) → %s", ticker, trade_date, signal)
 
 
 def run_analysis_in_thread(
@@ -117,6 +128,7 @@ def run_analysis_in_thread(
         try:
             _run(ticker, trade_date, config, tracker)
         except Exception as exc:
+            logger.error("分析失败: %s (%s) — %s", ticker, trade_date, exc, exc_info=True)
             tracker.mark_error(str(exc))
 
     t = threading.Thread(target=_target, daemon=True)

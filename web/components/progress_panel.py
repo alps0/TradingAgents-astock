@@ -11,7 +11,7 @@ def _status_badge(status: str) -> str:
     if status == "done":
         return '<span style="color:#22c55e; font-size:1.3rem;">●</span>'
     if status == "active":
-        return '<span style="color:#ff5a1f; font-size:1.3rem;">◉</span>'
+        return '<span style="color:#3b82f6; font-size:1.3rem;">◉</span>'
     return '<span style="color:#333; font-size:1.3rem;">○</span>'
 
 

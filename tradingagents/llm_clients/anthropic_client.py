@@ -19,8 +19,16 @@ class NormalizedChatAnthropic(ChatAnthropic):
     downstream handling.
     """
 
-    def invoke(self, input, config=None, **kwargs):
-        return normalize_content(super().invoke(input, config, **kwargs))
+    pass
+
+
+# Attach after class creation to avoid Pydantic v2 "non-annotated attribute"
+# errors when the code is Cython-compiled (cyfunction not recognised as method).
+def _anthropic_invoke(self, input, config=None, **kwargs):
+    return normalize_content(ChatAnthropic.invoke(self, input, config, **kwargs))
+
+
+NormalizedChatAnthropic.invoke = _anthropic_invoke
 
 
 class AnthropicClient(BaseLLMClient):

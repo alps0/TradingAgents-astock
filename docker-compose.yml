@@ -1,35 +1,17 @@
 services:
   tradingagents:
-    build: .
-    env_file:
-      - .env
-    volumes:
-      - tradingagents_data:/home/appuser/.tradingagents
-    tty: true
-    stdin_open: true
-
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    profiles:
-      - ollama
-
-  tradingagents-ollama:
-    build: .
+    image: tradingagents:arm64
+    ports:
+      - "8501:8501"
     env_file:
       - .env
     environment:
-      - LLM_PROVIDER=ollama
+      - APP_ROOT=/home/appuser/app
     volumes:
       - tradingagents_data:/home/appuser/.tradingagents
-    depends_on:
-      - ollama
-    tty: true
-    stdin_open: true
-    profiles:
-      - ollama
+      - app_env:/home/appuser/app
+    restart: unless-stopped
 
 volumes:
   tradingagents_data:
-  ollama_data:
+  app_env:

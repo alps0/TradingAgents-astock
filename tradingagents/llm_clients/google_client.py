@@ -13,8 +13,16 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
     This normalizes to string for consistent downstream handling.
     """
 
-    def invoke(self, input, config=None, **kwargs):
-        return normalize_content(super().invoke(input, config, **kwargs))
+    pass
+
+
+# Attach after class creation to avoid Pydantic v2 "non-annotated attribute"
+# errors when the code is Cython-compiled (cyfunction not recognised as method).
+def _google_invoke(self, input, config=None, **kwargs):
+    return normalize_content(ChatGoogleGenerativeAI.invoke(self, input, config, **kwargs))
+
+
+NormalizedChatGoogleGenerativeAI.invoke = _google_invoke
 
 
 class GoogleClient(BaseLLMClient):

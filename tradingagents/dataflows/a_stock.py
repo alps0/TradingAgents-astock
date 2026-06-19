@@ -233,11 +233,14 @@ def _em_get(url, params=None, headers=None, timeout=15, **kwargs):
     """
     wait = _EM_MIN_INTERVAL - (time.time() - _em_last_call[0])
     if wait > 0:
+        logger.debug("东财限流等待 %.1fs", wait)
         time.sleep(wait + random.uniform(0.1, 0.5))
     try:
-        return _EM_SESSION.get(
+        resp = _EM_SESSION.get(
             url, params=params, headers=headers, timeout=timeout, **kwargs
         )
+        logger.debug("东财请求: %s → %d", url.split("?")[0][-40:], resp.status_code)
+        return resp
     finally:
         _em_last_call[0] = time.time()
 
@@ -431,6 +434,7 @@ def get_stock_data(
 ) -> str:
     """Get OHLCV stock price data via mootdx."""
     code = _normalize_ticker(symbol)
+    logger.info("获取K线数据: %s (%s ~ %s)", code, start_date, end_date)
 
     data_source = "mootdx (TCP)"
     try:
@@ -588,6 +592,7 @@ def get_fundamentals(
 ) -> str:
     """Get company fundamentals from Tencent + mootdx + Eastmoney + 同花顺."""
     code = _normalize_ticker(ticker)
+    logger.info("获取基本面数据: %s", code)
 
     try:
         lines = []
@@ -1000,6 +1005,7 @@ def get_news(
 ) -> str:
     """Get stock-specific news via East Money direct API (Sina as fallback)."""
     code = _normalize_ticker(ticker)
+    logger.info("获取个股新闻: %s (%s ~ %s)", code, start_date, end_date)
 
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -1069,6 +1075,7 @@ def get_global_news(
     limit: Annotated[int, "Max articles"] = 10,
 ) -> str:
     """Get China/global financial news via direct HTTP (CLS + Eastmoney)."""
+    logger.info("获取全球财经新闻: %s (回溯%d天)", curr_date, look_back_days)
     start_dt = datetime.strptime(curr_date, "%Y-%m-%d") - relativedelta(
         days=look_back_days
     )
@@ -1171,6 +1178,7 @@ def get_insider_transactions(
     Uses mootdx F10 shareholder research as the closest equivalent.
     """
     code = _normalize_ticker(ticker)
+    logger.info("获取股东/内部人交易: %s", code)
 
     try:
         client = _get_mootdx_client()
@@ -1761,6 +1769,8 @@ def get_dragon_tiger_board(
         Formatted text with LHB appearances, top buyer/seller seats,
         and institutional activity.
     """
+    code = _normalize_ticker(ticker)
+    logger.info("获取龙虎榜: %s (%s)", code, trade_date)
     code = safe_ticker_component(ticker)
     end_dt = datetime.strptime(trade_date, "%Y-%m-%d")
     start_dt = end_dt - pd.Timedelta(days=look_back_days)
@@ -1890,6 +1900,7 @@ def get_lockup_expiry(
         expiry calendar with impact metrics.
     """
     code = safe_ticker_component(ticker)
+    logger.info("获取解禁日历: %s (%s)", code, trade_date)
     lines = [f"# 限售解禁日历 | {code} | {trade_date}"]
 
     # 1. 历史解禁记录 — eastmoney datacenter direct HTTP
@@ -1971,6 +1982,7 @@ def get_industry_comparison(
         the sector the target stock belongs to.
     """
     code = safe_ticker_component(ticker)
+    logger.info("获取行业对比: %s (%s)", code, trade_date)
     lines = [f"# 行业横向对比 | {code} | {trade_date}"]
 
     # 东财 push2 行业板块排名 (direct HTTP, replaces 同花顺 which has 401)

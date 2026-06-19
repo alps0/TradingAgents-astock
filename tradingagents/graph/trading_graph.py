@@ -9,6 +9,9 @@ from typing import Dict, Any, Tuple, List, Optional
 
 import yfinance as yf
 
+from tradingagents.log_config import setup_logging
+setup_logging()
+
 logger = logging.getLogger(__name__)
 
 from langgraph.prebuilt import ToolNode

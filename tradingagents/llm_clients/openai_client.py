@@ -23,13 +23,28 @@ class NormalizedChatOpenAI(ChatOpenAI):
     purpose-built subclasses below so this base class stays small.
     """
 
-    def invoke(self, input, config=None, **kwargs):
-        return normalize_content(super().invoke(input, config, **kwargs))
+    pass
 
-    def with_structured_output(self, schema, *, method=None, **kwargs):
-        if method is None:
-            method = "function_calling"
-        return super().with_structured_output(schema, method=method, **kwargs)
+
+# Pydantic v2 inspects the class namespace during ``__new__``.  When the
+# code is Cython-compiled, method overrides become ``cyfunction`` objects
+# which Pydantic does not recognise as methods and raises
+# "non-annotated attribute" errors.  Defining these overrides *after*
+# class creation avoids the inspection entirely while keeping the
+# runtime behaviour identical.
+
+def _normalized_invoke(self, input, config=None, **kwargs):
+    return normalize_content(ChatOpenAI.invoke(self, input, config, **kwargs))
+
+
+def _normalized_with_structured_output(self, schema, *, method=None, **kwargs):
+    if method is None:
+        method = "function_calling"
+    return ChatOpenAI.with_structured_output(self, schema, method=method, **kwargs)
+
+
+NormalizedChatOpenAI.invoke = _normalized_invoke
+NormalizedChatOpenAI.with_structured_output = _normalized_with_structured_output
 
 
 def _input_to_messages(input_: Any) -> list:
@@ -66,42 +81,53 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
        (see ``tradingagents/agents/utils/structured.py``).
     """
 
-    def _get_request_payload(self, input_, *, stop=None, **kwargs):
-        payload = super()._get_request_payload(input_, stop=stop, **kwargs)
-        outgoing = payload.get("messages", [])
-        for message_dict, message in zip(outgoing, _input_to_messages(input_)):
-            if not isinstance(message, AIMessage):
-                continue
-            reasoning = message.additional_kwargs.get("reasoning_content")
-            if reasoning is not None:
-                message_dict["reasoning_content"] = reasoning
-        return payload
+    pass
 
-    def _create_chat_result(self, response, generation_info=None):
-        chat_result = super()._create_chat_result(response, generation_info)
-        response_dict = (
-            response
-            if isinstance(response, dict)
-            else response.model_dump(
-                exclude={"choices": {"__all__": {"message": {"parsed"}}}}
-            )
+
+def _deepseek_get_request_payload(self, input_, *, stop=None, **kwargs):
+    payload = NormalizedChatOpenAI._get_request_payload(self, input_, stop=stop, **kwargs)
+    outgoing = payload.get("messages", [])
+    for message_dict, message in zip(outgoing, _input_to_messages(input_)):
+        if not isinstance(message, AIMessage):
+            continue
+        reasoning = message.additional_kwargs.get("reasoning_content")
+        if reasoning is not None:
+            message_dict["reasoning_content"] = reasoning
+    return payload
+
+
+def _deepseek_create_chat_result(self, response, generation_info=None):
+    chat_result = NormalizedChatOpenAI._create_chat_result(self, response, generation_info)
+    response_dict = (
+        response
+        if isinstance(response, dict)
+        else response.model_dump(
+            exclude={"choices": {"__all__": {"message": {"parsed"}}}}
         )
-        for generation, choice in zip(
-            chat_result.generations, response_dict.get("choices", [])
-        ):
-            reasoning = choice.get("message", {}).get("reasoning_content")
-            if reasoning is not None:
-                generation.message.additional_kwargs["reasoning_content"] = reasoning
-        return chat_result
+    )
+    for generation, choice in zip(
+        chat_result.generations, response_dict.get("choices", [])
+    ):
+        reasoning = choice.get("message", {}).get("reasoning_content")
+        if reasoning is not None:
+            generation.message.additional_kwargs["reasoning_content"] = reasoning
+    return chat_result
 
-    def with_structured_output(self, schema, *, method=None, **kwargs):
-        if self.model_name == "deepseek-reasoner":
-            raise NotImplementedError(
-                "deepseek-reasoner does not support tool_choice; structured "
-                "output is unavailable. Agent factories fall back to "
-                "free-text generation automatically."
-            )
-        return super().with_structured_output(schema, method=method, **kwargs)
+
+def _deepseek_with_structured_output(self, schema, *, method=None, **kwargs):
+    if self.model_name == "deepseek-reasoner":
+        raise NotImplementedError(
+            "deepseek-reasoner does not support tool_choice; structured "
+            "output is unavailable. Agent factories fall back to "
+            "free-text generation automatically."
+        )
+    return NormalizedChatOpenAI.with_structured_output(self, schema, method=method, **kwargs)
+
+
+DeepSeekChatOpenAI._get_request_payload = _deepseek_get_request_payload
+DeepSeekChatOpenAI._create_chat_result = _deepseek_create_chat_result
+DeepSeekChatOpenAI.with_structured_output = _deepseek_with_structured_output
+
 
 # Kwargs forwarded from user config to ChatOpenAI
 _PASSTHROUGH_KWARGS = (
@@ -113,7 +139,7 @@ _PASSTHROUGH_KWARGS = (
 _PROVIDER_CONFIG = {
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
     "deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY"),
-    "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
+    "qwen": ("https://dashscope.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
     "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),

@@ -15,8 +15,16 @@ _PASSTHROUGH_KWARGS = (
 class NormalizedAzureChatOpenAI(AzureChatOpenAI):
     """AzureChatOpenAI with normalized content output."""
 
-    def invoke(self, input, config=None, **kwargs):
-        return normalize_content(super().invoke(input, config, **kwargs))
+    pass
+
+
+# Attach after class creation to avoid Pydantic v2 "non-annotated attribute"
+# errors when the code is Cython-compiled (cyfunction not recognised as method).
+def _azure_invoke(self, input, config=None, **kwargs):
+    return normalize_content(AzureChatOpenAI.invoke(self, input, config, **kwargs))
+
+
+NormalizedAzureChatOpenAI.invoke = _azure_invoke
 
 
 class AzureOpenAIClient(BaseLLMClient):

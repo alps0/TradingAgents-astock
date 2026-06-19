@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,34 @@ def load_analysis(path: str) -> dict[str, Any]:
     """Load a saved analysis JSON file."""
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def delete_history(path: str) -> bool:
+    """Delete an analysis record by removing its entire date directory.
+
+    Each analysis is stored in a directory like:
+        ~/.tradingagents/logs/<ticker>/<date>/
+    This removes the whole <date> directory (including all log files within).
+
+    Returns True on success, False on failure.
+    """
+    log_path = Path(path)
+    if not log_path.exists():
+        return False
+
+    # Safety: only allow deletion under the results directory
+    try:
+        log_path.resolve().relative_to(_results_dir().resolve())
+    except ValueError:
+        return False
+
+    # Remove the date directory (parent of the log file)
+    date_dir = log_path.parent
+    try:
+        shutil.rmtree(date_dir)
+        return True
+    except OSError:
+        return False
 
 
 def extract_signal(state: dict[str, Any]) -> str:

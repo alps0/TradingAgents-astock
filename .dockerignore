@@ -5,11 +5,32 @@
 .idea
 .vscode
 .DS_Store
+.codebuddy
 __pycache__
 *.egg-info
+*.so
 build
 dist
 results
 eval_results
+generated-images
 Dockerfile
 docker-compose.yml
+docker-compose-local.yml
+
+# Tests & development files (not needed in Docker build)
+tests/
+examples/
+issues/
+test*.py
+main.py
+
+# Documentation & assets
+assets/
+AGENT.md
+CLAUDE.md
+DEV_LOG.md
+CHANGELOG.md
+CHANGES_FROM_UPSTREAM.md
+
+

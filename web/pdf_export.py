@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import platform
 import re
+import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import fpdf as _fpdf_mod
 from fpdf import FPDF
+
+logger = logging.getLogger(__name__)
+
+# Project-root bundled font (Noto Sans SC variable TTF — Simplified Chinese).
+# Must use TTF (TrueType outline), NOT OTF (CFF outline): fpdf2 embeds TTF
+# as CIDFontType2 which renders correctly in all PDF viewers, whereas CFF-based
+# OTF is embedded as CIDFontType0 which causes garbled text in many viewers.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_BUNDLED_FONT_TTF = _PROJECT_ROOT / "NotoSansSC[wght].ttf"
 
 
 # fpdf2 (maintained fork) and the abandoned pyfpdf 1.x BOTH import as `fpdf`, and
@@ -39,8 +52,6 @@ def _ensure_fpdf2() -> None:
 # Per-OS CJK font candidates. The current OS's fonts are tried first so a
 # user on Windows/Linux/macOS all get a working PDF without manual config.
 _WIN_FONTS = [
-    "C:/Windows/Fonts/msyh.ttc",      # 微软雅黑
-    "C:/Windows/Fonts/msyhbd.ttc",    # 微软雅黑 Bold
     "C:/Windows/Fonts/simhei.ttf",    # 黑体
     "C:/Windows/Fonts/simsun.ttc",    # 宋体
     "C:/Windows/Fonts/simfang.ttf",   # 仿宋
@@ -53,9 +64,8 @@ _MAC_FONTS = [
 ]
 _LINUX_FONTS = [
     "/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf",
-    "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
+    "/usr/share/fonts/truetype/noto/NotoSansSC[wght].ttf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/truetype/arphic/uming.ttc",
@@ -65,7 +75,7 @@ _LINUX_FONTS = [
 # fallback scan (deliberately excludes bare "noto", which also matches the
 # Latin-only Noto family).
 _CJK_FONT_KEYWORDS = (
-    "msyh", "simhei", "simsun", "simfang", "yahei", "fangsong",
+    "simhei", "simsun", "simfang", "fangsong",
     "pingfang", "heiti", "stheiti", "stsong", "songti", "kaiti",
     "hiragino sans gb", "arial unicode",
     "notosanscjk", "notoserifcjk", "notosanssc", "notoserifsc",
@@ -94,21 +104,28 @@ def _search_dirs() -> list[str]:
 
 
 def _find_cjk_font() -> str | None:
-    """Locate a CJK-capable TTF/TTC/OTF font, cross-platform.
+    """Locate a CJK-capable TTF/TTC font, cross-platform.
 
-    1. Try the known per-OS candidate paths.
-    2. Fall back to recursively scanning common font directories for any
-       file whose name looks CJK-capable.
+    Priority:
+    1. Project-bundled TTF variable font (best compatibility with fpdf2).
+    2. Known per-OS candidate paths.
+    3. Recursive scan of common font directories.
     """
+    # Bundled TTF variable font — best option for fpdf2 (CIDFontType2 embedding).
+    if _BUNDLED_FONT_TTF.exists():
+        return str(_BUNDLED_FONT_TTF)
+
+    # System font candidates.
     for path in _font_candidates():
         if Path(path).exists():
             return path
 
+    # Recursive scan.
     for directory in _search_dirs():
         dpath = Path(directory)
         if not dpath.exists():
             continue
-        for ext in ("*.ttc", "*.ttf", "*.otf"):
+        for ext in ("*.ttf", "*.ttc"):
             try:
                 for font_path in sorted(dpath.rglob(ext)):
                     if any(k in font_path.name.lower() for k in _CJK_FONT_KEYWORDS):
@@ -116,6 +133,56 @@ def _find_cjk_font() -> str | None:
             except OSError:
                 continue
     return None
+
+
+def _find_cjk_font_bold() -> str | None:
+    """Locate a bold CJK font.
+
+    The bundled TTF variable font contains all weights, so fpdf2 uses the
+    same file for bold synthesis. For system fonts, fpdf2 synthesizes bold
+    automatically when no separate bold font is found (returns None).
+    """
+    if _BUNDLED_FONT_TTF.exists():
+        return str(_BUNDLED_FONT_TTF)
+    return None
+
+
+def _install_bundled_fonts_to_system() -> bool:
+    """Try to install bundled TTF font to the system so other apps can use it too.
+
+    Returns True if installation succeeded (or was not needed).
+    """
+    if not _BUNDLED_FONT_TTF.exists():
+        return False
+
+    system = platform.system()
+    if system == "Linux":
+        target_dir = Path.home() / ".fonts"
+    elif system == "Darwin":
+        target_dir = Path.home() / "Library" / "Fonts"
+    else:
+        # Windows: fonts are usually already available; skip auto-install.
+        return False
+
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        dst = target_dir / _BUNDLED_FONT_TTF.name
+        if not dst.exists():
+            shutil.copy2(_BUNDLED_FONT_TTF, dst)
+        # Rebuild font cache (Linux only)
+        if system == "Linux":
+            try:
+                subprocess.run(
+                    ["fc-cache", "-f", str(target_dir)],
+                    capture_output=True,
+                    timeout=30,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+        logger.info("已安装思源字体到 %s", target_dir)
+        return True
+    except OSError:
+        return False
 
 
 def _strip_think(text: str) -> str:
@@ -159,34 +226,52 @@ class _ReportPDF(FPDF):
         self.signal = signal
         font_path = _find_cjk_font()
         if not font_path:
+            # Last resort: try to install bundled fonts to system and retry
+            _install_bundled_fonts_to_system()
+            font_path = _find_cjk_font()
+        if not font_path:
             raise RuntimeError(
                 "未找到可用的中文字体，无法生成 PDF。请安装一款中文字体后重试"
-                "（Windows 自带微软雅黑/黑体，macOS 自带苹方，Linux 可 "
+                "（Windows 自带黑体，macOS 自带苹方，Linux 可 "
                 "`apt install fonts-noto-cjk`），或改用「下载 Markdown」导出。"
             )
+        bold_path = _find_cjk_font_bold()
         self.add_font("CJK", "", font_path)
-        self.add_font("CJK", "B", font_path)
+        self.add_font("CJK", "B", bold_path or font_path)
 
-    def _use_font(self, style: str = "", size: int = 10) -> None:
+    def _use_font(self, style: str = "B", size: int = 10) -> None:
         self.set_font("CJK", style, size)
 
+    def _extra_bold_cell(self, w, h, txt, border=0, ln=0, align="", fill=False, link="") -> None:
+        """Draw a cell multiple times with tiny offsets to simulate extra-bold weight."""
+        # Save position before drawing
+        x0, y0 = self.get_x(), self.get_y()
+        offsets = [(0, 0), (0.15, 0), (-0.15, 0), (0, 0.15), (0, -0.15)]
+        for dx, dy in offsets:
+            self.set_xy(x0 + dx, y0 + dy)
+            self.cell(w, h, txt, border=border, ln=0, align=align, fill=fill, link=link)
+        # Restore position and apply ln behavior
+        self.set_xy(x0, y0 + h if ln else y0)
+        if ln:
+            self.x = self.l_margin
+
     def header(self) -> None:
-        self._use_font("", 8)
-        self.set_text_color(150, 150, 150)
+        self._use_font("B", 8)
+        self.set_text_color(90, 90, 90)
         self.cell(0, 6, f"A股多Agent投研分析  |  {self.ticker}  |  {self.trade_date}", align="C")
         self.ln(8)
-        self.set_draw_color(60, 60, 60)
+        self.set_draw_color(40, 40, 40)
         self.line(10, self.get_y(), self.w - 10, self.get_y())
         self.ln(4)
 
     def footer(self) -> None:
         self.set_y(-15)
-        self._use_font("", 8)
-        self.set_text_color(120, 120, 120)
+        self._use_font("B", 8)
+        self.set_text_color(50, 50, 50)
         self.cell(0, 5, f"Page {self.page_no()}/{{nb}}", align="C")
         self.ln(4)
-        self._use_font("", 6)
-        self.set_text_color(160, 160, 160)
+        self._use_font("B", 6)
+        self.set_text_color(70, 70, 70)
         self.cell(0, 4, "仅供学习研究，不构成投资建议", align="C")
 
     def add_cover(self) -> None:
@@ -195,16 +280,16 @@ class _ReportPDF(FPDF):
 
         self._use_font("B", 24)
         self.set_text_color(255, 90, 31)
-        self.cell(0, 12, "A股多Agent投研分析报告", align="C")
+        self._extra_bold_cell(0, 12, "AI股票分析报告", align="C")
         self.ln(20)
 
         self._use_font("B", 36)
-        self.set_text_color(30, 30, 30)
-        self.cell(0, 18, self.ticker, align="C")
+        self.set_text_color(20, 20, 20)
+        self._extra_bold_cell(0, 18, self.ticker, align="C")
         self.ln(16)
 
-        self._use_font("", 14)
-        self.set_text_color(100, 100, 100)
+        self._use_font("B", 14)
+        self.set_text_color(30, 30, 30)
         self.cell(0, 10, f"分析日期: {self.trade_date}", align="C")
         self.ln(8)
         self.cell(0, 10, f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
@@ -213,14 +298,14 @@ class _ReportPDF(FPDF):
         r, g, b = _signal_color(self.signal)
         self._use_font("B", 40)
         self.set_text_color(r, g, b)
-        self.cell(0, 20, self.signal.upper(), align="C")
+        self._extra_bold_cell(0, 20, self.signal.upper(), align="C")
         self.ln(20)
 
-        self._use_font("", 9)
-        self.set_text_color(120, 120, 120)
+        self._use_font("B", 9)
+        self.set_text_color(40, 40, 40)
         self.multi_cell(
             0, 5,
-            "免责声明: 本报告由 AI 多 Agent 系统自动生成, 仅供学习研究与技术演示, "
+            "免责声明: 本报告由 AI 自动生成, 仅供学习研究与技术演示, "
             "不构成任何投资建议。投资决策请咨询持牌专业机构。"
             "使用本报告所产生的任何损失由使用者自行承担。",
             align="C",
@@ -230,7 +315,7 @@ class _ReportPDF(FPDF):
         self.add_page()
         self._use_font("B", 16)
         self.set_text_color(255, 90, 31)
-        self.cell(0, 10, title)
+        self._extra_bold_cell(0, 10, title)
         self.ln(12)
 
         cleaned = _strip_think(content)
@@ -253,29 +338,29 @@ class _ReportPDF(FPDF):
             # Headings: ### → 11pt, ## → 13pt, # → 14pt
             if stripped.startswith("###"):
                 self._use_font("B", 11)
-                self.set_text_color(50, 50, 50)
-                self.cell(0, 7, stripped.lstrip("#").strip())
+                self.set_text_color(10, 10, 10)
+                self._extra_bold_cell(0, 7, stripped.lstrip("#").strip())
                 self.ln(8)
                 i += 1
                 continue
             if stripped.startswith("##"):
                 self._use_font("B", 13)
-                self.set_text_color(40, 40, 40)
-                self.cell(0, 8, stripped.lstrip("#").strip())
+                self.set_text_color(10, 10, 10)
+                self._extra_bold_cell(0, 8, stripped.lstrip("#").strip())
                 self.ln(9)
                 i += 1
                 continue
             if stripped.startswith("#"):
                 self._use_font("B", 14)
                 self.set_text_color(255, 90, 31)
-                self.cell(0, 9, stripped.lstrip("#").strip())
+                self._extra_bold_cell(0, 9, stripped.lstrip("#").strip())
                 self.ln(10)
                 i += 1
                 continue
 
             # Horizontal rule
             if stripped in ("---", "***", "___"):
-                self.set_draw_color(180, 180, 180)
+                self.set_draw_color(100, 100, 100)
                 y = self.get_y() + 2
                 self.line(10, y, self.w - 10, y)
                 self.ln(6)
@@ -284,8 +369,8 @@ class _ReportPDF(FPDF):
 
             # Bullet points (-, *, numbered)
             if re.match(r"^[-*]\s", stripped) or re.match(r"^\d+[.)]\s", stripped):
-                self._use_font("", 10)
-                self.set_text_color(40, 40, 40)
+                self._use_font("B", 10)
+                self.set_text_color(10, 10, 10)
                 if re.match(r"^[-*]\s", stripped):
                     bullet = "  •  "
                     body = stripped[2:].strip()
@@ -305,8 +390,8 @@ class _ReportPDF(FPDF):
                 if re.match(r"^\|[-:\s|]+\|$", stripped):
                     i += 1
                     continue
-                self._use_font("", 9)
-                self.set_text_color(60, 60, 60)
+                self._use_font("B", 9)
+                self.set_text_color(10, 10, 10)
                 cells = [c.strip() for c in stripped.strip("|").split("|")]
                 row_text = "    ".join(_strip_md_inline(c) for c in cells)
                 self.set_x(self.l_margin)
@@ -324,8 +409,8 @@ class _ReportPDF(FPDF):
                 i += 1
 
             if para_lines:
-                self._use_font("", 10)
-                self.set_text_color(40, 40, 40)
+                self._use_font("B", 10)
+                self.set_text_color(10, 10, 10)
                 para = " ".join(para_lines)
                 para = _strip_md_inline(para)
                 self.set_x(self.l_margin)

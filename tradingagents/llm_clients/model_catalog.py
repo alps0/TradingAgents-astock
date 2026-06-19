@@ -78,12 +78,12 @@ MODEL_OPTIONS: ProviderModeOptions = {
     },
     "qwen": {
         "quick": [
-            ("Qwen 3.5 Flash", "qwen3.5-flash"),
+            ("Qwen 3.6 Plus", "qwen3.6-plus"),
             ("Qwen Plus", "qwen-plus"),
             ("Custom model ID", "custom"),
         ],
         "deep": [
-            ("Qwen 3.6 Plus", "qwen3.6-plus"),
+            ("Qwen 3.7 Plus", "qwen3.7-plus"),
             ("Qwen 3.5 Plus", "qwen3.5-plus"),
             ("Qwen 3 Max", "qwen3-max"),
             ("Custom model ID", "custom"),

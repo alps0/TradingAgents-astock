@@ -247,7 +247,17 @@ tradingagents-web
 
 # 方式二：直接运行
 streamlit run web/app.py
+
+# 方式三：Docker 部署(在arm64架构上运行)
+docker build -t tradingagents:arm64 .
+docker-compose up -d
+
+
 ```
+
+
+
+
 
 打开浏览器访问 `http://localhost:8501`。
 

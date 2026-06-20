@@ -96,6 +96,9 @@ def _run(ticker: str, trade_date: str, config: dict, tracker: ProgressTracker) -
     last_chunk: dict[str, Any] = {}
 
     for chunk in graph.graph.stream(init_state, **args):
+        if tracker.is_cancelled:
+            logger.info("分析已取消: %s (%s)", ticker, trade_date)
+            return
         last_chunk = chunk
         _detect_completed_stages(chunk, tracker)
         _infer_active_stage(tracker)

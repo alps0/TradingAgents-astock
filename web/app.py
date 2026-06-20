@@ -290,7 +290,7 @@ with st.sidebar:
 
 # ── Settings dialog ─────────────────────────────────────────────────────────
 
-@st.dialog("⚙️ LLM 参数设置", width="large")
+@st.dialog("⚙️ LLM 参数设置", width="small")
 def _settings_dialog() -> None:
     """Modal dialog for configuring LLM provider, API key, and models."""
 
@@ -489,6 +489,12 @@ if viewing_history:
 
 # State 2: Analysis running
 elif tracker and tracker.is_running:
+    # Handle stop button click
+    if st.session_state.get("stop_analysis_btn"):
+        tracker.cancel()
+        st.warning("⏹ 分析已停止")
+        st.session_state.pop("tracker", None)
+        st.rerun()
     render_progress(tracker)
     time.sleep(2)
     st.rerun()
@@ -507,6 +513,13 @@ elif tracker and tracker.is_complete:
 elif tracker and tracker.error:
     st.error(f"分析失败: {tracker.error}")
     if st.button("重试"):
+        st.session_state.pop("tracker", None)
+        st.rerun()
+
+# State 5: Analysis cancelled
+elif tracker and tracker.is_cancelled:
+    st.warning("⏹ 分析已停止")
+    if st.button("新建分析"):
         st.session_state.pop("tracker", None)
         st.rerun()
 

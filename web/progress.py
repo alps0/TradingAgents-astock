@@ -36,6 +36,7 @@ class ProgressTracker:
 
     is_running: bool = False
     is_complete: bool = False
+    is_cancelled: bool = False
     error: Optional[str] = None
 
     current_stage: str = ""
@@ -74,6 +75,11 @@ class ProgressTracker:
     def mark_error(self, err: str) -> None:
         with self._lock:
             self.error = err
+            self.is_running = False
+
+    def cancel(self) -> None:
+        with self._lock:
+            self.is_cancelled = True
             self.is_running = False
 
     def update_stats(self, llm: int, tool: int, tok_in: int, tok_out: int) -> None:

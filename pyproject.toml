@@ -57,7 +57,7 @@ include = ["tradingagents*", "cli*", "web*"]
 
 [tool.setuptools.package-data]
 cli = ["static/*"]
-"web" = ["../NotoSansSC*.ttf"]
+"web" = ["../NotoSansCJKsc-VF.ttf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

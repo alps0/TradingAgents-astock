@@ -1,6 +1,7 @@
 services:
   tradingagents:
-    image: tradingagents:arm64
+    image: tradingagents:latest
+    container_name: tradingagents-1
     ports:
       - "8501:8501"
     env_file:
@@ -8,10 +9,5 @@ services:
     environment:
       - APP_ROOT=/home/appuser/app
     volumes:
-      - tradingagents_data:/home/appuser/.tradingagents
-      - app_env:/home/appuser/app
+      - ~/.tradingagents:/home/appuser/.tradingagents
     restart: unless-stopped
-
-volumes:
-  tradingagents_data:
-  app_env:

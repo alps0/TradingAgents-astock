@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -231,6 +230,41 @@ st.markdown(
 
 # ── Build config ─────────────────────────────────────────────────────────────
 
+def _catalog_values_for(provider_key: str, mode: str) -> list[str]:
+    """Return the list of model id values for a provider+mode, or [] if absent."""
+    if provider_key not in MODEL_OPTIONS:
+        return []
+    return [value for _, value in MODEL_OPTIONS[provider_key].get(mode, [])]
+
+
+def _find_option_index(values: list[str], target: str) -> int | None:
+    """Return index of target in values, or None if not present."""
+    try:
+        return values.index(target)
+    except ValueError:
+        return None
+
+
+def _find_custom_index(provider_key: str, mode: str) -> int | None:
+    """Return the index of the "custom" pseudo-option, or None if absent."""
+    return _find_option_index(_catalog_values_for(provider_key, mode), "custom")
+
+
+def _resolve_env_model(env_value: str, provider_key: str, mode: str, custom_key: str) -> None:
+    """If env_value is a non-catalog model, pre-populate the custom text input key.
+
+    Called once at session init so the settings dialog displays the user's
+    .env-defined custom model name instead of silently falling back to the
+    first catalog option.
+    """
+    if not env_value:
+        return
+    values = _catalog_values_for(provider_key, mode)
+    if _find_option_index(values, env_value) is not None:
+        return  # Known model — nothing to pre-populate
+    st.session_state.setdefault(custom_key, env_value)
+
+
 def _init_session_from_env() -> None:
     """Load persisted settings from .env into session_state on first run."""
     if st.session_state.get("_env_loaded"):
@@ -247,6 +281,10 @@ def _init_session_from_env() -> None:
     base_url = os.getenv("BACKEND_URL", "")
     if base_url:
         st.session_state.setdefault("llm_base_url", base_url)
+    # If the .env model is not in the catalog, surface it as a custom model
+    # so the settings dialog shows the actual value rather than a silent fallback.
+    _resolve_env_model(quick, provider, "quick", "settings_custom_quick_model")
+    _resolve_env_model(deep, provider, "deep", "settings_custom_deep_model")
     st.session_state["_env_loaded"] = True
 
 _init_session_from_env()
@@ -342,12 +380,19 @@ def _settings_dialog() -> None:
         quick_values = [value for _, value in quick_options]
         deep_labels = [label for label, _ in deep_options]
         deep_values = [value for _, value in deep_options]
+        custom_quick_idx = _find_custom_index(provider_key, "quick")
+        custom_deep_idx = _find_custom_index(provider_key, "deep")
 
         # Quick model
         current_quick = st.session_state.get("quick_think_llm", quick_values[0])
-        try:
+        if _find_option_index(quick_values, current_quick) is not None:
             quick_default = quick_values.index(current_quick)
-        except ValueError:
+        elif custom_quick_idx is not None:
+            # .env value is a custom (non-catalog) model — select the "Custom" entry
+            # and pre-populate the text input with the .env value.
+            quick_default = custom_quick_idx
+            st.session_state.setdefault("settings_custom_quick_model", current_quick)
+        else:
             quick_default = 0
 
         quick_idx = st.selectbox(
@@ -370,9 +415,12 @@ def _settings_dialog() -> None:
 
         # Deep model
         current_deep = st.session_state.get("deep_think_llm", deep_values[0])
-        try:
+        if _find_option_index(deep_values, current_deep) is not None:
             deep_default = deep_values.index(current_deep)
-        except ValueError:
+        elif custom_deep_idx is not None:
+            deep_default = custom_deep_idx
+            st.session_state.setdefault("settings_custom_deep_model", current_deep)
+        else:
             deep_default = 0
 
         deep_idx = st.selectbox(
@@ -489,15 +537,26 @@ if viewing_history:
 
 # State 2: Analysis running
 elif tracker and tracker.is_running:
-    # Handle stop button click
-    if st.session_state.get("stop_analysis_btn"):
-        tracker.cancel()
-        st.warning("⏹ 分析已停止")
-        st.session_state.pop("tracker", None)
-        st.rerun()
-    render_progress(tracker)
-    time.sleep(2)
-    st.rerun()
+    # Use @st.fragment(run_every=...) for auto-refresh instead of
+    # time.sleep + st.rerun().  The old sleep+rerun pattern breaks in
+    # Docker when WebSocket connections are unstable — the rerun signal
+    # never reaches the browser, so the stop button becomes unresponsive.
+    # A fragment only re-renders its own subtree, keeping the rest of the
+    # page (including button click handlers) fully interactive.
+    @st.fragment(run_every="2s")
+    def _live_progress():
+        t = st.session_state.get("tracker")
+        if t is None or not t.is_running:
+            # Analysis finished or cancelled while fragment was sleeping —
+            # trigger a full rerun so the state machine transitions.
+            st.rerun()
+        if st.session_state.get("stop_analysis_btn"):
+            t.cancel()
+            st.session_state.pop("tracker", None)
+            st.rerun()
+        render_progress(t)
+
+    _live_progress()
 
 # State 3: Analysis complete
 elif tracker and tracker.is_complete:

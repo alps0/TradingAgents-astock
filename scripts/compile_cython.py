@@ -23,10 +23,16 @@ from pathlib import Path
 # Modules that MUST remain as .py:
 #   - Entry points referenced by [project.scripts] in pyproject.toml
 #   - Streamlit app.py (Streamlit requires .py source to execute)
+#   - All files that call st.* APIs (Cython cannot resolve Streamlit's
+#     dynamic attribute dispatch and silently drops those calls at compile
+#     time, resulting in missing UI elements like buttons and progress bars).
 KEEP_AS_PY: set[Path] = {
     Path("cli") / "main.py",
     Path("web") / "launch.py",
     Path("web") / "app.py",
+    #Path("web") / "components" / "sidebar.py",
+    #Path("web") / "components" / "progress_panel.py",
+    #Path("web") / "components" / "report_viewer.py",
 }
 
 # Top-level packages to compile

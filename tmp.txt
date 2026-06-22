@@ -1,0 +1,4 @@
+tradingagents-1  | 2026-06-22 11:24:49 [WARNING] web.pdf_export: Found non-variable font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc, which may not support weight variations. Consider installing NotoSansSC[wght].ttf or NotoSansCJKsc-VF.ttf for better PDF quality.
+
+
+

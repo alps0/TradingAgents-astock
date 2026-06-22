@@ -249,7 +249,7 @@ tradingagents-web
 streamlit run web/app.py
 
 # 方式三：Docker 部署(在arm64架构上运行)
-docker build -t tradingagents:arm64 .
+docker build -t tradingagents .
 docker-compose up -d
 
 

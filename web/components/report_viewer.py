@@ -7,7 +7,7 @@ from typing import Any
 
 import streamlit as st
 
-from web.pdf_export import generate_markdown, generate_pdf
+from web.pdf_export import generate_markdown, generate_pdf, is_pdf_available
 
 
 def _strip_think(text: str) -> str:
@@ -83,27 +83,44 @@ def render_report(
         st.download_button(
             "📥 下载 Markdown",
             data=md_text.encode("utf-8"),
-            file_name=f"TradingAgents-Astock_{ticker}_{trade_date}.md",
+            file_name=f"TradingAgents_{ticker}_{trade_date}.md",
             mime="text/markdown",
             use_container_width=True,
         )
     with col_pdf:
-        try:
-            pdf_bytes = generate_pdf(final_state, ticker, trade_date, signal)
-            st.download_button(
-                "📄 下载 PDF",
-                data=pdf_bytes,
-                file_name=f"TradingAgents-Astock_{ticker}_{trade_date}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
-        except Exception as exc:  # noqa: BLE001 — never let PDF crash the page
+        # Quick check: is PDF generation possible? (no font loading, just file check)
+        if not is_pdf_available():
             st.button(
                 "📄 PDF 不可用",
                 disabled=True,
                 use_container_width=True,
-                help=f"PDF 生成失败，请改用 Markdown 导出。原因：{exc}",
+                help="未找到可用的中文字体，无法生成 PDF。请安装中文字体或改用 Markdown 导出。",
             )
+        else:
+            # Use session state to cache PDF bytes, generate only once per report
+            pdf_cache_key = f"_pdf_{ticker}_{trade_date}_{signal}"
+            if pdf_cache_key not in st.session_state:
+                with st.spinner("正在生成 PDF..."):
+                    try:
+                        pdf_bytes = generate_pdf(final_state, ticker, trade_date, signal)
+                        st.session_state[pdf_cache_key] = pdf_bytes
+                    except Exception as exc:  # noqa: BLE001
+                        st.session_state[pdf_cache_key] = None
+                        st.button(
+                            "📄 PDF 不可用",
+                            disabled=True,
+                            use_container_width=True,
+                            help=f"PDF 生成失败，请改用 Markdown 导出。原因：{exc}",
+                        )
+            
+            if st.session_state.get(pdf_cache_key) is not None:
+                st.download_button(
+                    "📄 下载 PDF",
+                    data=st.session_state[pdf_cache_key],
+                    file_name=f"TradingAgents_{ticker}_{trade_date}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
     st.markdown("---")
 

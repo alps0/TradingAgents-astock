@@ -9,5 +9,8 @@ services:
     environment:
       - APP_ROOT=/home/appuser/app
     volumes:
-      - ~/.tradingagents:/home/appuser/.tradingagents
+      - tradingagents-data:/home/appuser/.tradingagents
     restart: unless-stopped
+
+volumes:
+  tradingagents-data:

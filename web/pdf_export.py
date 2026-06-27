@@ -10,9 +10,10 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from tradingagents.time_utils import format_report_time
 
 import fpdf as _fpdf_mod
 from fpdf import FPDF
@@ -439,7 +440,7 @@ class _ReportPDF(FPDF):
         self.set_text_color(30, 30, 30)
         self.cell(0, 10, f"分析日期: {self.trade_date}", align="C")
         self.ln(8)
-        self.cell(0, 10, f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self.cell(0, 10, f"生成时间: {format_report_time()}", align="C")
         self.ln(20)
 
         r, g, b = _signal_color(self.signal)
@@ -650,7 +651,7 @@ def generate_markdown(final_state: dict[str, Any], ticker: str, trade_date: str,
         "",
         f"- **股票代码**：{ticker}",
         f"- **分析日期**：{trade_date}",
-        f"- **生成时间**：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"- **生成时间**：{format_report_time()}",
         f"- **交易信号**：**{signal.upper()}**",
         "",
         "> ⚠️ 本报告由 AI 多 Agent 系统自动生成，仅供学习研究与技术演示，"

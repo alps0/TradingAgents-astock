@@ -73,6 +73,7 @@ from web.components.sidebar import render_sidebar  # noqa: E402
 from web.history import extract_signal, load_analysis, delete_history  # noqa: E402
 from web.progress import ProgressTracker  # noqa: E402
 from web.runner import run_analysis_in_thread  # noqa: E402
+from web.session_utils import clear_large_session_state  # noqa: E402
 
 # ── LLM provider constants ──────────────────────────────────────────────────
 
@@ -499,6 +500,11 @@ with _top_col2:
 
 
 # ── Handle "Start Analysis" trigger ──────────────────────────────────────────
+
+# Keep only the minimal interactive state for the current run. Large cached PDF
+# bytes and full report payloads are pruned so repeated history view / report
+# navigation does not accumulate memory indefinitely.
+clear_large_session_state(st.session_state)
 
 start_req = st.session_state.pop("start_analysis", None)
 if start_req:

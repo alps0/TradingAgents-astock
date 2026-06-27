@@ -86,8 +86,9 @@ RUN mkdir -p /home/appuser/.cache/tradingagents/fonts \
 # Streamlit config (theme + WebSocket keep-alive for Docker)
 # Copy before USER switch so we can set ownership
 COPY --from=builder --chown=appuser:appuser /build/.streamlit /home/appuser/app/.streamlit
+COPY --from=builder /build/scripts/docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
+RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
-USER appuser
 WORKDIR /home/appuser/app
 
 # Streamlit server config for Docker
@@ -95,8 +96,9 @@ WORKDIR /home/appuser/app
 ENV STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_PORT=8501 \
-    APP_ROOT=/home/appuser/app
+    APP_ROOT=/home/appuser/app \
+    HOME=/home/appuser
 
 EXPOSE 8501
 
-ENTRYPOINT ["tradingagents-web"]
+ENTRYPOINT ["/usr/local/bin/docker_entrypoint.sh"]

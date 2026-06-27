@@ -8,6 +8,7 @@ from typing import Any
 import streamlit as st
 
 from web.pdf_export import generate_markdown, generate_pdf, is_pdf_available
+from web.session_utils import clear_large_session_state
 
 
 def _strip_think(text: str) -> str:
@@ -112,7 +113,7 @@ def render_report(
                             use_container_width=True,
                             help=f"PDF 生成失败，请改用 Markdown 导出。原因：{exc}",
                         )
-            
+
             if st.session_state.get(pdf_cache_key) is not None:
                 st.download_button(
                     "📄 下载 PDF",
@@ -121,6 +122,9 @@ def render_report(
                     mime="application/pdf",
                     use_container_width=True,
                 )
+
+            # Keep only the current PDF bytes in memory; discard older cached PDFs.
+            clear_large_session_state(st.session_state, keep_keys={pdf_cache_key})
 
     st.markdown("---")
 

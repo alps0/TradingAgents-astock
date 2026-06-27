@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import shutil
@@ -69,20 +70,70 @@ def delete_history(path: str) -> bool:
         return False
 
 
+def _fallback_parse_rating(text: str, default: str = "Hold") -> str:
+    """Lightweight fallback parser used when the packaged module is unavailable."""
+    rating_map = {name.lower(): name for name in ("Buy", "Overweight", "Hold", "Underweight", "Sell")}
+    pattern = re.compile(r"rating.*?[:\-][\s*]*(\w+)", re.IGNORECASE)
+
+    for line in str(text).splitlines():
+        match = pattern.search(line)
+        if match and match.group(1).lower() in rating_map:
+            return rating_map[match.group(1).lower()]
+
+    for line in str(text).splitlines():
+        for word in line.lower().split():
+            clean = word.strip("*:.,")
+            if clean in rating_map:
+                return rating_map[clean]
+
+    return default
+
+
+def _load_parse_rating():
+    """Load the rating parser without importing the full agents package."""
+    module_path = Path(__file__).resolve().parents[1] / "tradingagents" / "agents" / "utils" / "rating.py"
+    try:
+        spec = importlib.util.spec_from_file_location("tradingagents_agents_utils_rating", module_path)
+        if spec is None or spec.loader is None:
+            return _fallback_parse_rating
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return getattr(module, "parse_rating", _fallback_parse_rating)
+    except (FileNotFoundError, ImportError, OSError, AttributeError):
+        return _fallback_parse_rating
+
+
+_PARSE_RATING = None
+
+
+def _get_parse_rating():
+    global _PARSE_RATING
+    if _PARSE_RATING is None:
+        _PARSE_RATING = _load_parse_rating()
+    return _PARSE_RATING
+
+
 def extract_signal(state: dict[str, Any]) -> str:
-    """Extract the short signal (Buy/Sell/Hold) from a final state dict."""
-    import re
+    """Extract the portfolio rating from a final state dict.
+
+    The live analysis UI uses the 5-tier rating from the Portfolio Manager's
+    structured output. History view should preserve the same rating, rather than
+    falling back to a coarse Buy/Sell/Hold keyword search.
+    """
+    parse_rating = _get_parse_rating()
 
     for field in (
+        "final_trade_decision",
         "investment_plan",
         "trader_investment_decision",
-        "final_trade_decision",
     ):
         text = state.get(field, "")
         if not text:
             continue
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-        for keyword in ("BUY", "SELL", "HOLD"):
-            if keyword in cleaned.upper():
-                return keyword.capitalize()
-    return "N/A"
+        cleaned = re.sub(r"<think>.*?</think>", "", str(text), flags=re.DOTALL)
+        parsed = parse_rating(cleaned, default="Hold")
+        if parsed and parsed != "Hold":
+            return parsed
+
+    return "Hold"

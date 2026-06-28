@@ -37,6 +37,7 @@ dependencies = [
     "fpdf2>=2.8.0",
     "python-dotenv>=1.1.0",
     "mootdx>=0.10.0",
+    "cryptography>=43.0.0",
 ]
 
 [project.urls]
@@ -58,6 +59,7 @@ include = ["tradingagents*", "cli*", "web*"]
 [tool.setuptools.package-data]
 cli = ["static/*"]
 "web" = ["../NotoSansCJKsc-VF.ttf"]
+"tradingagents" = ["data/keys/*.pem"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

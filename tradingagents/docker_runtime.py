@@ -18,6 +18,7 @@ def prepare_runtime_directories(home_dir: str | os.PathLike[str] | None = None, 
         app_home / ".tradingagents" / "cache",
         app_home / ".tradingagents" / "logs",
         app_home / ".tradingagents" / "memory",
+        app_home / ".tradingagents" / "licenses",
         app_home / ".streamlit",
     ]
 

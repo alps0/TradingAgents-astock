@@ -1,0 +1,24 @@
+{
+  "fingerprint": "453315426ad6905a1e3e491faee52800de2dea8bcd99910ff31167b0ef4e208f",
+  "license_type": "professional",
+  "features": [
+    "stock_analysis",
+    "pdf_export",
+    "history_view",
+    "bull_bear_debate",
+    "risk_debate",
+    "policy_analysis",
+    "hot_money_tracking",
+    "lockup_monitoring",
+    "fundamentals_analysis",
+    "news_analysis",
+    "social_media_analysis",
+    "market_analysis"
+  ],
+  "max_agents": 7,
+  "issued_at": "2026-06-28T02:18:46.826576+00:00",
+  "expires_at": "2026-12-26T02:18:46.826576+00:00",
+  "issuer": "TradingAgents",
+  "customer_name": "客户名称",
+  "signature": "314df0c48aaf48b811e6c71b6db8ced471c58cc0e529fb46420ee067b4e6b76671c65feb9a982fa4080f9d5d10641432d813257f724fae88cfd2f229ab47eeaaa0eecf3be42c620616e578aecb7f975eb7f58c1192f0549c9f8a2eebd3d40358a7339606afa7b2182e734e123e16589a6e3323209edbddf1474d2c8b9e7f4cfdad012948e51d17a37a466eafb79015c50d3fa554f47f2f586f807bbfe651fdde71784341af72fcc46ef7d291562d940eca2d1ec300e1b24d354ab695d283255f128332aec72b70e46f8adf209d7ab36f8037da63eb1241a0a406694f70c44738bbc8194ea7eca7b579924206cb121d687a72082be36f285ef8ad222a95f34376"
+}

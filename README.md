@@ -229,6 +229,8 @@ print(decision)
 ### 4. CLI 方式
 
 ```bash
+conda activate tradingagents
+
 tradingagents            # 交互式 CLI
 tradingagents --help     # 查看所有选项
 ```
@@ -242,6 +244,7 @@ tradingagents --help     # 查看所有选项
 ### 启动
 
 ```bash
+conda activate tradingagents
 # 方式一：命令行启动（推荐）
 tradingagents-web
 

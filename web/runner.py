@@ -122,6 +122,14 @@ def run_analysis_in_thread(
     tracker: ProgressTracker,
 ) -> threading.Thread:
     """Launch the pipeline in a daemon thread. Returns the thread handle."""
+    # License enforcement (compiled .so layer). Raises LicenseError
+    # synchronously so the UI can surface the message to the user instead
+    # of starting a doomed background thread. This complements the deeper
+    # check inside TradingAgentsGraph.propagate() — both live in compiled
+    # modules and survive tampering with the plaintext web/app.py.
+    from tradingagents.license_service import require_license
+    require_license("stock_analysis")
+
     tracker.ticker = ticker
     tracker.trade_date = trade_date
     tracker.is_running = True

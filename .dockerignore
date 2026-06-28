@@ -25,6 +25,9 @@ issues/
 test*.py
 main.py
 
+# License tooling — private keys must never ship in the Docker image
+tool/
+
 # Documentation & assets
 assets/
 AGENT.md

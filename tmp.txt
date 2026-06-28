@@ -1,4 +1,25 @@
-tradingagents-1  | 2026-06-22 11:24:49 [WARNING] web.pdf_export: Found non-variable font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc, which may not support weight variations. Consider installing NotoSansSC[wght].ttf or NotoSansCJKsc-VF.ttf for better PDF quality.
+docker compose up
+[+] up 1/1
+ ✔ Container tradingagents-1 Recreated                                                                    2.6s
+Attaching to tradingagents-1
+tradingagents-1  | [entrypoint-diag] /etc/machine-id present: 9027dc0aa4874fb9b55e2065eab17657
+tradingagents-1  | [entrypoint-diag] volume machine_id file exists: {
+tradingagents-1  |   "machine_id": "0d64b958-f958-46c9-96a8-b33e75cf02d6",
+tradingagents-1  |   "source": "uuid",
+tradingagents-1  |   "hostname": "8f6a0e614a96"
+tradingagents-1  | }
 
 
+
+docker compose up
+[+] up 2/2
+ ✔ Network tradingagents-astock_default Created                                                           0.0s
+ ✔ Container tradingagents-1            Created                                                           0.1s
+Attaching to tradingagents-1
+tradingagents-1  | [entrypoint-diag] /etc/machine-id present: 9027dc0aa4874fb9b55e2065eab17657
+tradingagents-1  | [entrypoint-diag] volume machine_id file exists: {
+tradingagents-1  |   "machine_id": "0d64b958-f958-46c9-96a8-b33e75cf02d6",
+tradingagents-1  |   "source": "uuid",
+tradingagents-1  |   "hostname": "8f6a0e614a96"
+tradingagents-1  | }
 

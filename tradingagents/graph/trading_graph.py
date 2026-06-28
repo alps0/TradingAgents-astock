@@ -308,6 +308,14 @@ class TradingAgentsGraph:
         with a per-ticker SqliteSaver so a crashed run can resume from the last
         successful node on a subsequent invocation with the same ticker+date.
         """
+        # License enforcement at the deepest compiled layer. This file is
+        # compiled to .so by Cython (see scripts/compile_cython.py), so the
+        # check cannot be bypassed by editing the plaintext web/app.py.
+        # Raises LicenseError if unlicensed — caller is responsible for
+        # surfacing the error to the user.
+        from tradingagents.license_service import require_license
+        require_license("stock_analysis")
+
         self.ticker = company_name
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.

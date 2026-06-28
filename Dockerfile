@@ -74,6 +74,17 @@ RUN fc-cache -f -v || true
 RUN useradd --create-home appuser \
     && mkdir -p /home/appuser/app/.streamlit
 
+# Ensure /etc/machine-id exists for stable license fingerprinting.
+# python:3.12-slim doesn't include systemd, so the file is missing by default.
+# Generate it once at build time — all containers from this image share the
+# same machine-id. The license service reads it on first run and persists the
+# value to ~/.tradingagents/machine_id (in the Docker volume), so the
+# fingerprint stays stable across container rebuilds as long as the volume
+# is preserved.
+RUN if [ ! -s /etc/machine-id ]; then \
+        python3 -c "import uuid; print(uuid.uuid4().hex)" > /etc/machine-id; \
+    fi
+
 # Copy pre-instantiated static fonts into appuser's font cache.
 # This lets the first PDF export skip the ~15s fontTools instantiation
 # (web/pdf_export.py reads from ~/.cache/tradingagents/fonts/).

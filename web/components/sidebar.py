@@ -6,6 +6,7 @@ from datetime import date
 
 import streamlit as st
 
+from web.components.license import render_license_sidebar_badge
 from web.history import delete_history, get_history
 
 
@@ -39,6 +40,9 @@ def render_sidebar() -> None:
         unsafe_allow_html=True,
     )
 
+    # License status badge under the title
+    render_license_sidebar_badge()
+
     st.markdown("---")
     st.markdown("#### 新建分析")
 
@@ -58,11 +62,16 @@ def render_sidebar() -> None:
     tracker = st.session_state.get("tracker")
     is_busy = tracker is not None and tracker.is_running
 
+    # License enforcement: block new analysis when unlicensed.
+    license_status = st.session_state.get("_license_status", {})
+    is_licensed = bool(license_status.get("is_licensed"))
+
     if st.button(
         "开始分析" if not is_busy else "分析进行中...",
         use_container_width=True,
-        disabled=is_busy or not ticker,
+        disabled=is_busy or not ticker or not is_licensed,
         type="primary",
+        help=None if is_licensed else "未授权 — 请在「设置 → 软件授权」中导入授权证书",
     ):
         resolved_code, err = _resolve_user_input(ticker)
         if err:

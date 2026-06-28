@@ -217,3 +217,13 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Docker build artifacts — large tar archives should never be committed
+*.tar
+tradingagents.tar
+
+# License — keep bundled public key, ignore private keys & user licenses
+tool/keys/
+**/licenses/*.json
+!tradingagents/data/keys/public_key.pem
+tradingagents/data/keys/private_key.pem
